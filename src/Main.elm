@@ -154,17 +154,19 @@ update msg model =
                 n =
                     round val
 
-                lenResults =
-                    n * 5
-
                 names =
                     List.range n (6 * n)
                         |> List.map String.fromInt
+
+                lenResults =
+                    List.length names
             in
             { model
                 | dice = List.repeat n Dice.create
-                , results = Array.repeat lenResults 0
-                , chart = Chart.updateDatapoints names model.chart
+                , results =
+                    Array.repeat lenResults 0
+                , chart =
+                    Chart.updateDatapoints names model.chart
             }
                 |> withCommand Cmd.none
 
