@@ -4,7 +4,7 @@ NAME="Wuerfeling"
 
 ID=$(date +%s)
 SRC_ELM="./src/Main.elm"
-SRC_HTML="./index.html"
+SRC_HTML="./html/index.html"
 TMP_OUT_ELM="/tmp/$(date +%s)_$NAME.elm.js"
 TMP_OUT_UJS="/tmp/$(date +%s)_$NAME.ujs.js"
 DEST_SCRIPT="./rel/$NAME.js"
