@@ -1,203 +1,83 @@
-module Chart exposing (Chart, create, render, setBackgroundColor, setBarColor, setHeight, setTextColor, setWidth, update, updateDatapoints)
+module Chart exposing (render)
 
-import Element exposing (..)
-import Element.Background as Background
-import Element.Font as Font
+import Array exposing (Array)
+import Element exposing (Element, html)
+import LineChart
+import LineChart.Area
+import LineChart.Axis
+import LineChart.Axis.Intersection
+import LineChart.Axis.Line
+import LineChart.Axis.Range
+import LineChart.Axis.Tick
+import LineChart.Axis.Ticks
+import LineChart.Axis.Title
+import LineChart.Colors
+import LineChart.Container
+import LineChart.Dots
+import LineChart.Events
+import LineChart.Grid
+import LineChart.Interpolation
+import LineChart.Junk
+import LineChart.Legends
+import LineChart.Line
 
 
-type alias DataPoint =
-    ( Int, String )
-
-
-type alias Chart =
-    { datapoints : List DataPoint
-    , width : Maybe Int
-    , height : Maybe Int
-    , barColor : Maybe Color
-    , backgroundColor : Maybe Color
-    , textColor : Maybe Color
+type alias Result =
+    { count : Int
+    , sum : Int
     }
 
 
-init : Chart
-init =
-    { datapoints = []
-    , width = Nothing
-    , height = Nothing
-    , barColor = Nothing
-    , backgroundColor = Nothing
-    , textColor = Nothing
-    }
-
-
-create : List String -> Chart
-create names =
-    let
-        datapoints =
-            List.map
-                (Tuple.pair 0)
-                names
-    in
-    { init | datapoints = datapoints }
-
-
-updateDatapoints : List String -> Chart -> Chart
-updateDatapoints names chart =
-    let
-        datapoints =
-            List.map
-                (Tuple.pair 0)
-                names
-    in
-    { chart | datapoints = datapoints }
-
-
-setWidth : Int -> Chart -> Chart
-setWidth width chart =
-    { chart | width = Just width }
-
-
-setHeight : Int -> Chart -> Chart
-setHeight height chart =
-    { chart | height = Just height }
-
-
-setBarColor : Color -> Chart -> Chart
-setBarColor color chart =
-    { chart | barColor = Just color }
-
-
-setBackgroundColor : Color -> Chart -> Chart
-setBackgroundColor color chart =
-    { chart | backgroundColor = Just color }
-
-
-setTextColor : Color -> Chart -> Chart
-setTextColor color chart =
-    { chart | textColor = Just color }
-
-
-update : List Int -> Chart -> Chart
-update values chart =
-    let
-        datapoints =
-            List.map2
-                (\value tuple ->
-                    Tuple.mapFirst (\first -> value) tuple
-                )
-                values
-                chart.datapoints
-    in
-    { chart | datapoints = datapoints }
-
-
-render : Chart -> Element msg
-render chart =
-    let
-        w =
-            chart.width
-                |> Maybe.map px
-                |> Maybe.withDefault fill
-
-        h =
-            chart.height
-                |> Maybe.map px
-                |> Maybe.withDefault fill
-
-        bgclr =
-            chart.backgroundColor
-                |> Maybe.withDefault (rgb255 255 255 255)
-
-        barclr =
-            chart.barColor
-                |> Maybe.withDefault (rgb255 0 180 0)
-
-        fontclr =
-            chart.textColor
-                |> Maybe.withDefault (rgb255 0 0 0)
-
-        maximumValue =
-            List.foldl
-                (\t max ->
-                    let
-                        v =
-                            Tuple.first t
-                    in
-                    if v > max then
-                        v
-
-                    else
-                        max
-                )
-                -1
-                chart.datapoints
-
-        bars =
-            chart.datapoints
-                |> List.map
-                    (\( value, name ) ->
-                        let
-                            len =
-                                List.length chart.datapoints
-
-                            heightLower =
-                                if value == 0 then
-                                    px 0
-
-                                else if value == maximumValue then
-                                    fill
-
-                                else
-                                    fillPortion value
-
-                            heightUpper =
-                                if value == 0 then
-                                    fill
-
-                                else if value == maximumValue then
-                                    px 0
-
-                                else
-                                    fillPortion (maximumValue - value)
-                        in
-                        column
-                            [ width <| fillPortion len
-                            , height fill
-                            , Font.color fontclr
-                            , Font.center
-                            , alignBottom
-
-                            --, explain Debug.todo
-                            ]
-                            [ el
-                                [ Font.size 16
-                                , height heightUpper
-                                , Background.color bgclr
-                                , width fill
-                                , alignBottom
-                                , padding 5
-                                ]
-                                (text name)
-                            , el
-                                [ Font.size 10
-                                , Font.family <| List.singleton Font.monospace
-                                , Font.bold
-                                , height heightLower
-                                , width fill
-                                , Background.color barclr
-                                , alignBottom
-                                ]
-                                (text <| String.padLeft 2 ' ' <| String.fromInt value)
-                            ]
-                    )
-    in
-    row
-        [ width w
-        , height h
-        , Background.color bgclr
-        , spacing 2
-        , padding 10
-
-        --, explain Debug.todo
-        ]
-        bars
+render : Array Result -> Element msg
+render results =
+    LineChart.viewCustom
+        { x =
+            LineChart.Axis.custom
+                { title = LineChart.Axis.Title.default "Augen"
+                , variable = Just << toFloat << (+) 1 << .sum
+                , pixels = 800
+                , range = LineChart.Axis.Range.default
+                , axisLine = LineChart.Axis.Line.default
+                , ticks = LineChart.Axis.Ticks.int <| Array.length results
+                }
+        , y =
+            LineChart.Axis.custom
+                { title = LineChart.Axis.Title.default "Anzahl"
+                , variable = Just << toFloat << .count
+                , pixels = 300
+                , range =
+                    LineChart.Axis.Range.custom
+                        (\{ min, max } ->
+                            { min = 0
+                            , max = max + max / 10
+                            }
+                        )
+                , axisLine = LineChart.Axis.Line.default
+                , ticks =
+                    LineChart.Axis.Ticks.intCustom
+                        10
+                        (\x ->
+                            LineChart.Axis.Tick.custom
+                                { position = toFloat x
+                                , color = LineChart.Colors.black
+                                , width = 2
+                                , length = 10
+                                , grid = True
+                                , direction = LineChart.Axis.Tick.negative
+                                , label = Just (LineChart.Junk.label LineChart.Colors.black (String.fromInt x))
+                                }
+                        )
+                }
+        , container = LineChart.Container.default "line-chart-1"
+        , interpolation = LineChart.Interpolation.default
+        , intersection = LineChart.Axis.Intersection.default
+        , legends = LineChart.Legends.none
+        , events = LineChart.Events.default
+        , junk = LineChart.Junk.default
+        , grid = LineChart.Grid.default
+        , area = LineChart.Area.default
+        , line = LineChart.Line.default
+        , dots = LineChart.Dots.default
+        }
+        [ LineChart.line LineChart.Colors.pink LineChart.Dots.circle "Würfel" <| Array.toList results ]
+        |> html

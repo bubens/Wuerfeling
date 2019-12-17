@@ -55,6 +55,12 @@ type Msg
     | Frame
 
 
+type alias Result =
+    { sum : Int
+    , count : Int
+    }
+
+
 
 -- MODEL
 
@@ -63,9 +69,8 @@ type alias Model =
     { status : Throws
     , dice : List Dice.Dice
     , inputThrows : Input
-    , results : Array Int
+    , results : Array Result
     , title : String
-    , chart : Chart.Chart
     }
 
 
@@ -121,22 +126,19 @@ nDiceRolls n =
 -- INIT
 
 
+initResults : Int -> Array Result
+initResults len =
+    Array.repeat len 0
+        |> Array.indexedMap Result
+
+
 init : flags -> Url.Url -> Navigation.Key -> ( Model, Cmd msg )
 init flags url key =
     ( { status = Setting
       , dice = List.singleton <| Dice.create
       , inputThrows = Valid "100"
-      , results = Array.repeat 6 0
+      , results = initResults 6
       , title = "Würfeling"
-      , chart =
-            Chart.create
-                (List.range 1 6
-                    |> List.map String.fromInt
-                )
-                |> Chart.setHeight 300
-                |> Chart.setBarColor colorColor
-                |> Chart.setBackgroundColor brightBackgroundColor
-                |> Chart.setTextColor textColor
       }
     , Cmd.none
     )
@@ -163,10 +165,7 @@ update msg model =
             in
             { model
                 | dice = List.repeat n Dice.create
-                , results =
-                    Array.repeat lenResults 0
-                , chart =
-                    Chart.updateDatapoints names model.chart
+                , results = initResults lenResults
             }
                 |> withCommand Cmd.none
 
@@ -246,18 +245,14 @@ update msg model =
                             newResult =
                                 Array.update
                                     (sum - n)
-                                    ((+) 1)
+                                    (\result ->
+                                        { result | count = result.count + 1 }
+                                    )
                                     model.results
-
-                            newChart =
-                                Chart.update
-                                    (Array.toList newResult)
-                                    model.chart
                         in
                         { model
                             | status = Running l (i + 1)
                             , results = newResult
-                            , chart = newChart
                         }
                             |> withCommand (Random.generate DiceRolled (nDiceRolls n))
 
@@ -486,6 +481,10 @@ viewDice dice =
         )
 
 
+
+--xAxisConfig : Properties (Int, Int) msg
+
+
 view : Model -> Document Msg
 view model =
     let
@@ -495,8 +494,8 @@ view model =
         dice =
             viewDice model.dice
 
-        graph =
-            Chart.render model.chart
+        chart =
+            Chart.render model.results
 
         form =
             viewForm model
@@ -512,7 +511,7 @@ view model =
         ]
         [ header
         , dice
-        , graph
+        , chart
         , form
         ]
         |> Element.layout
