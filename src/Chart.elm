@@ -11,6 +11,7 @@ import LineChart.Axis.Range
 import LineChart.Axis.Tick
 import LineChart.Axis.Ticks
 import LineChart.Axis.Title
+import LineChart.Axis.Values
 import LineChart.Colors
 import LineChart.Container
 import LineChart.Dots
@@ -30,19 +31,36 @@ type alias Result =
 
 render : Array Result -> Element msg
 render results =
+    let
+        lenResults =
+            Array.length results
+
+        nOfDice =
+            toFloat lenResults
+                / 6
+                |> round
+    in
     LineChart.viewCustom
         { x =
             LineChart.Axis.custom
-                { title = LineChart.Axis.Title.default "Augen"
-                , variable = Just << toFloat << (+) 1 << .sum
+                { title =
+                    LineChart.Axis.Title.atAxisMax
+                        -40
+                        30
+                        "Augen"
+                , variable = Just << toFloat << (+) nOfDice << .sum
                 , pixels = 800
                 , range = LineChart.Axis.Range.default
                 , axisLine = LineChart.Axis.Line.default
-                , ticks = LineChart.Axis.Ticks.int <| Array.length results
+                , ticks = LineChart.Axis.Ticks.int lenResults
                 }
         , y =
             LineChart.Axis.custom
-                { title = LineChart.Axis.Title.default "Anzahl"
+                { title =
+                    LineChart.Axis.Title.atAxisMax
+                        40
+                        0
+                        "Anzahl"
                 , variable = Just << toFloat << .count
                 , pixels = 300
                 , range =
@@ -54,30 +72,39 @@ render results =
                         )
                 , axisLine = LineChart.Axis.Line.default
                 , ticks =
-                    LineChart.Axis.Ticks.intCustom
-                        10
-                        (\x ->
-                            LineChart.Axis.Tick.custom
-                                { position = toFloat x
-                                , color = LineChart.Colors.black
-                                , width = 2
-                                , length = 10
-                                , grid = True
-                                , direction = LineChart.Axis.Tick.negative
-                                , label = Just (LineChart.Junk.label LineChart.Colors.black (String.fromInt x))
-                                }
+                    LineChart.Axis.Ticks.custom
+                        (\range _ ->
+                            LineChart.Axis.Values.int
+                                (LineChart.Axis.Values.around 5)
+                                { range | min = 0 }
+                                |> List.map LineChart.Axis.Tick.int
                         )
                 }
-        , container = LineChart.Container.default "line-chart-1"
-        , interpolation = LineChart.Interpolation.default
-        , intersection = LineChart.Axis.Intersection.default
-        , legends = LineChart.Legends.none
-        , events = LineChart.Events.default
-        , junk = LineChart.Junk.default
-        , grid = LineChart.Grid.default
-        , area = LineChart.Area.default
-        , line = LineChart.Line.default
-        , dots = LineChart.Dots.default
+        , container =
+            LineChart.Container.spaced
+                "line-chart"
+                40
+                40
+                40
+                40
+        , interpolation =
+            LineChart.Interpolation.default
+        , intersection =
+            LineChart.Axis.Intersection.default
+        , legends =
+            LineChart.Legends.none
+        , events =
+            LineChart.Events.default
+        , junk =
+            LineChart.Junk.default
+        , grid =
+            LineChart.Grid.default
+        , area =
+            LineChart.Area.default
+        , line =
+            LineChart.Line.default
+        , dots =
+            LineChart.Dots.default
         }
         [ LineChart.line LineChart.Colors.pink LineChart.Dots.circle "Würfel" <| Array.toList results ]
         |> html
