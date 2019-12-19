@@ -27,7 +27,7 @@ render : Dict Int Int -> Element msg
 render results =
     let
         lenResults =
-            (List.length << Dict.toList) results
+            Dict.size results
     in
     LineChart.viewCustom
         { x =

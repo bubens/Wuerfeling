@@ -144,7 +144,7 @@ init flags url key =
     ( { status = Setting
       , dice = List.singleton <| Dice.create
       , inputThrows = Valid "100"
-      , results = initResults 6
+      , results = initResults 1
       , title = "Würfeling"
       }
     , Cmd.none
@@ -245,14 +245,7 @@ update msg model =
                             newResult =
                                 Dict.update
                                     sum
-                                    (\maybeSum ->
-                                        case maybeSum of
-                                            Just s ->
-                                                Just (s + 1)
-
-                                            Nothing ->
-                                                Nothing
-                                    )
+                                    (Maybe.map <| (+) 1)
                                     model.results
                         in
                         { model
@@ -484,10 +477,6 @@ viewDice dice =
             )
             dice
         )
-
-
-
---xAxisConfig : Properties (Int, Int) msg
 
 
 view : Model -> Document Msg
