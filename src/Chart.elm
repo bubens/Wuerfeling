@@ -1,6 +1,6 @@
 module Chart exposing (render)
 
-import Array exposing (Array)
+import Dict exposing (Dict)
 import Element exposing (Element, html)
 import LineChart
 import LineChart.Area
@@ -23,22 +23,11 @@ import LineChart.Legends
 import LineChart.Line
 
 
-type alias Result =
-    { count : Int
-    , sum : Int
-    }
-
-
-render : Array Result -> Element msg
+render : Dict Int Int -> Element msg
 render results =
     let
         lenResults =
-            Array.length results
-
-        nOfDice =
-            toFloat lenResults
-                / 6
-                |> round
+            (List.length << Dict.toList) results
     in
     LineChart.viewCustom
         { x =
@@ -48,7 +37,7 @@ render results =
                         -40
                         30
                         "Augen"
-                , variable = Just << toFloat << (+) nOfDice << .sum
+                , variable = Just << toFloat << Tuple.first
                 , pixels = 800
                 , range = LineChart.Axis.Range.default
                 , axisLine =
@@ -63,7 +52,7 @@ render results =
                         40
                         0
                         "Anzahl"
-                , variable = Just << toFloat << .count
+                , variable = Just << toFloat << Tuple.second
                 , pixels = 300
                 , range =
                     LineChart.Axis.Range.custom
@@ -113,5 +102,5 @@ render results =
         , dots =
             LineChart.Dots.default
         }
-        [ LineChart.line LineChart.Colors.pink LineChart.Dots.circle "Würfel" <| Array.toList results ]
+        [ LineChart.line LineChart.Colors.pink LineChart.Dots.circle "Würfel" <| Dict.toList results ]
         |> html

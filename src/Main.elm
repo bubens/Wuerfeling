@@ -7,6 +7,7 @@ import Browser.Events exposing (onAnimationFrame)
 import Browser.Navigation as Navigation
 import Chart
 import Dice
+import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -69,7 +70,7 @@ type alias Model =
     { status : Throws
     , dice : List Dice.Dice
     , inputThrows : Input
-    , results : Array Result
+    , results : Dict Int Int
     , title : String
     }
 
@@ -78,9 +79,13 @@ type alias Model =
 -- UTILS
 
 
-withCommand : b -> a -> ( a, b )
-withCommand command model =
-    ( model, command )
+leftOf : b -> a -> ( a, b )
+leftOf right left =
+    ( left, right )
+
+
+withCommand =
+    leftOf
 
 
 withTitle : String -> List (Html msg) -> Document msg
@@ -126,10 +131,12 @@ nDiceRolls n =
 -- INIT
 
 
-initResults : Int -> Array Result
-initResults len =
-    Array.repeat len 0
-        |> Array.indexedMap Result
+initResults : Int -> Dict Int Int
+initResults dice =
+    List.range dice (6 * dice)
+        |> List.map
+            (\v -> ( v, 0 ))
+        |> Dict.fromList
 
 
 init : flags -> Url.Url -> Navigation.Key -> ( Model, Cmd msg )
@@ -153,19 +160,12 @@ update msg model =
     case msg of
         DiceChanged val ->
             let
-                n =
+                diceCount =
                     round val
-
-                names =
-                    List.range n (6 * n)
-                        |> List.map String.fromInt
-
-                lenResults =
-                    List.length names
             in
             { model
-                | dice = List.repeat n Dice.create
-                , results = initResults lenResults
+                | dice = List.repeat diceCount Dice.create
+                , results = initResults diceCount
             }
                 |> withCommand Cmd.none
 
@@ -243,10 +243,15 @@ update msg model =
                                     |> List.sum
 
                             newResult =
-                                Array.update
-                                    (sum - n)
-                                    (\result ->
-                                        { result | count = result.count + 1 }
+                                Dict.update
+                                    sum
+                                    (\maybeSum ->
+                                        case maybeSum of
+                                            Just s ->
+                                                Just (s + 1)
+
+                                            Nothing ->
+                                                Nothing
                                     )
                                     model.results
                         in
