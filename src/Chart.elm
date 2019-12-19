@@ -51,7 +51,9 @@ render results =
                 , variable = Just << toFloat << (+) nOfDice << .sum
                 , pixels = 800
                 , range = LineChart.Axis.Range.default
-                , axisLine = LineChart.Axis.Line.default
+                , axisLine =
+                    LineChart.Axis.Line.full
+                        LineChart.Colors.grayLight
                 , ticks = LineChart.Axis.Ticks.int lenResults
                 }
         , y =
@@ -70,7 +72,9 @@ render results =
                             , max = max + max / 10
                             }
                         )
-                , axisLine = LineChart.Axis.Line.default
+                , axisLine =
+                    LineChart.Axis.Line.full
+                        LineChart.Colors.grayLight
                 , ticks =
                     LineChart.Axis.Ticks.custom
                         (\range _ ->
@@ -98,11 +102,14 @@ render results =
         , junk =
             LineChart.Junk.default
         , grid =
-            LineChart.Grid.default
+            LineChart.Grid.lines
+                0.1
+                LineChart.Colors.grayLightest
         , area =
             LineChart.Area.default
         , line =
-            LineChart.Line.default
+            LineChart.Line.wider
+                3.0
         , dots =
             LineChart.Dots.default
         }
