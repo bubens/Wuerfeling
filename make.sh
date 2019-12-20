@@ -23,9 +23,9 @@ echo "Making Sorting" &&
 echo "Step 1: Compile elm-code" &&
 elm make --optimize --output=$TMP_OUT_ELM $SRC_ELM &&
 echo "Step 2: Compress compiled code" &&
-uglifyjs $TMP_OUT_ELM --output=$TMP_OUT_UJS --compress 'pure_funcs="F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9",pure_getters,keep_fargs=false,unsafe_comps,unsafe' &&
+terser $TMP_OUT_ELM --output=$TMP_OUT_UJS --compress 'pure_funcs="F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9",pure_getters,keep_fargs=false,unsafe_comps,unsafe' &&
 echo "Step 3: Mangle compressed code" &&
-uglifyjs $TMP_OUT_UJS --output=$DEST_SCRIPT --mangle &&
+terser $TMP_OUT_UJS --output=$DEST_SCRIPT --mangle &&
 echo "Step 4: Copy HTML" &&
 cp -v $SRC_HTML $DEST_HTML &&
 echo "Results:"
