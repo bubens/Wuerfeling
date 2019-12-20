@@ -79,7 +79,7 @@ render results =
                 40
                 40
                 40
-                40
+                80
         , interpolation =
             LineChart.Interpolation.default
         , intersection =
