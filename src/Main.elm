@@ -143,7 +143,7 @@ init : flags -> Url.Url -> Navigation.Key -> ( Model, Cmd msg )
 init flags url key =
     ( { status = Setting
       , dice = List.singleton <| Dice.create
-      , inputThrows = Valid "100"
+      , inputThrows = Valid "1"
       , results = initResults 1
       , title = "Würfeling"
       }
@@ -208,7 +208,7 @@ update msg model =
                                         |> Maybe.withDefault 0
                             in
                             { model | status = Running l 0 }
-                                |> withCommand (Random.generate DiceRolled (nDiceRolls n))
+                                |> withCommand Cmd.none
 
                         _ ->
                             ( model, Cmd.none )
@@ -220,13 +220,34 @@ update msg model =
             let
                 newDice =
                     List.map2
-                        (\d f ->
-                            Dice.roll f d
-                        )
-                        model.dice
+                        Dice.roll
                         faces
+                        model.dice
+
+                sumOfDice =
+                    newDice
+                        |> List.map Dice.toInt
+                        |> List.sum
+
+                newResult =
+                    Dict.update
+                        sumOfDice
+                        (Maybe.map <| (+) 1)
+                        model.results
+
+                ( rollsExpected, rollsSoFar ) =
+                    case model.status of
+                        Running l i ->
+                            ( l, i + 1 )
+
+                        _ ->
+                            ( 0, 0 )
             in
-            { model | dice = newDice }
+            { model
+                | dice = newDice
+                , results = newResult
+                , status = Running rollsExpected rollsSoFar
+            }
                 |> withCommand Cmd.none
 
         Frame ->
@@ -236,23 +257,8 @@ update msg model =
                         let
                             n =
                                 List.length model.dice
-
-                            sum =
-                                model.dice
-                                    |> List.map Dice.toInt
-                                    |> List.sum
-
-                            newResult =
-                                Dict.update
-                                    sum
-                                    (Maybe.map <| (+) 1)
-                                    model.results
                         in
-                        { model
-                            | status = Running l (i + 1)
-                            , results = newResult
-                        }
-                            |> withCommand (Random.generate DiceRolled (nDiceRolls n))
+                        ( model, Random.generate DiceRolled (nDiceRolls n) )
 
                     else
                         { model | status = Setting }
