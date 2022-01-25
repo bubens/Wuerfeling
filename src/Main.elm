@@ -1,7 +1,5 @@
 module Main exposing (main)
 
-import Array exposing (Array)
-import Array.Extra as Array
 import Browser exposing (Document)
 import Browser.Events exposing (onAnimationFrame)
 import Browser.Navigation as Navigation
@@ -56,13 +54,6 @@ type Msg
     | Frame
 
 
-type alias Result =
-    { sum : Int
-    , count : Int
-    }
-
-
-
 -- MODEL
 
 
@@ -83,7 +74,7 @@ leftOf : b -> a -> ( a, b )
 leftOf right left =
     ( left, right )
 
-
+withCommand : (Cmd Msg) -> Model -> (Model, Cmd Msg)
 withCommand =
     leftOf
 
@@ -140,7 +131,7 @@ initResults dice =
 
 
 init : flags -> Url.Url -> Navigation.Key -> ( Model, Cmd msg )
-init flags url key =
+init _ _ _ =
     ( { status = Setting
       , dice = List.singleton <| Dice.create
       , inputThrows = Valid "1"
@@ -200,8 +191,6 @@ update msg model =
                     case model.inputThrows of
                         Valid str ->
                             let
-                                n =
-                                    List.length model.dice
 
                                 l =
                                     String.toInt str
@@ -541,12 +530,12 @@ subscriptions model =
 
 
 urlChange : Url.Url -> Msg
-urlChange url =
+urlChange _ =
     Noop
 
 
 urlRequest : Browser.UrlRequest -> Msg
-urlRequest request =
+urlRequest _ =
     Noop
 
 

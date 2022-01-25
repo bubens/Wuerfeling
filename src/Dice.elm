@@ -29,9 +29,7 @@ module Dice exposing
 
 -}
 
-import Array
 import Html
-import Maybe
 import Random
 import Svg
 import Svg.Attributes as Attributes
