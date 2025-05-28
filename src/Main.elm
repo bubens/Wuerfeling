@@ -89,22 +89,26 @@ withTitle title body =
 
 darkBackgroundColor : Element.Color
 darkBackgroundColor =
-    rgb255 26 40 31
+    --rgb255 26 40 31
+    rgb255 215 217 215
 
 
 brightBackgroundColor : Element.Color
 brightBackgroundColor =
-    rgb255 57 62 70
+    --rgb255 57 62 70
+    rgb255 72 69 56
 
 
 textColor : Element.Color
 textColor =
-    rgb255 192 232 249
+    --rgb255 192 232 249
+    rgb255 51 101 138
 
 
 colorColor : Element.Color
 colorColor =
-    rgb255 206 123 145
+    --rgb255 206 123 145
+    rgb255 242 100 25
 
 
 borders : Directions

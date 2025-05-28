@@ -21,6 +21,7 @@ import LineChart.Interpolation
 import LineChart.Junk
 import LineChart.Legends
 import LineChart.Line
+import Svg.Attributes
 
 
 render : Dict Int Int -> Element msg
@@ -42,7 +43,7 @@ render results =
                 , range = LineChart.Axis.Range.default
                 , axisLine =
                     LineChart.Axis.Line.full
-                        LineChart.Colors.grayLight
+                        LineChart.Colors.black
                 , ticks = LineChart.Axis.Ticks.int lenResults
                 }
         , y =
@@ -63,7 +64,7 @@ render results =
                         )
                 , axisLine =
                     LineChart.Axis.Line.full
-                        LineChart.Colors.grayLight
+                        LineChart.Colors.black
                 , ticks =
                     LineChart.Axis.Ticks.custom
                         (\range _ ->
@@ -74,12 +75,18 @@ render results =
                         )
                 }
         , container =
-            LineChart.Container.spaced
-                "line-chart"
-                40
-                40
-                40
-                80
+            --LineChart.Container.spaced "line-chart" 40 40 40 80
+            LineChart.Container.custom
+                { attributesHtml =
+                    [ Svg.Attributes.color "rgb(255, 255, 255)"
+
+                    --, Html.Attributes.style "margin-top" "20px"
+                    ]
+                , attributesSvg = []
+                , size = LineChart.Container.static
+                , margin = LineChart.Container.Margin 40 40 40 80
+                , id = "line-chart"
+                }
         , interpolation =
             LineChart.Interpolation.default
         , intersection =
@@ -93,7 +100,7 @@ render results =
         , grid =
             LineChart.Grid.lines
                 0.1
-                LineChart.Colors.grayLightest
+                LineChart.Colors.black
         , area =
             LineChart.Area.default
         , line =
@@ -102,5 +109,5 @@ render results =
         , dots =
             LineChart.Dots.default
         }
-        [ LineChart.line LineChart.Colors.pink LineChart.Dots.circle "Würfel" <| Dict.toList results ]
+        [ LineChart.line LineChart.Colors.rust LineChart.Dots.circle "Würfel" <| Dict.toList results ]
         |> html
