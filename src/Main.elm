@@ -11,6 +11,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Element.Region as Region
 import Html exposing (Html)
 import Random
 import Url
@@ -54,6 +55,7 @@ type Msg
     | Frame
 
 
+
 -- MODEL
 
 
@@ -74,7 +76,8 @@ leftOf : b -> a -> ( a, b )
 leftOf right left =
     ( left, right )
 
-withCommand : (Cmd Msg) -> Model -> (Model, Cmd Msg)
+
+withCommand : Cmd Msg -> Model -> ( Model, Cmd Msg )
 withCommand =
     leftOf
 
@@ -191,7 +194,6 @@ update msg model =
                     case model.inputThrows of
                         Valid str ->
                             let
-
                                 l =
                                     String.toInt str
                                         |> Maybe.withDefault 0
@@ -267,14 +269,17 @@ update msg model =
 viewHeader : String -> Element msg
 viewHeader title =
     row
-        [ Font.size 28
+        [ Font.size 42
         , Font.color colorColor
-        , width <| fill
+        , Font.family [ Font.typeface "Poiret One" ]
+        , Font.bold
+        , width fill
         , paddingEach
             { borders
-                | top = 20
-                , right = 20
-                , left = 20
+                | top = 30
+                , right = 30
+                , left = 30
+                , bottom = 20
             }
         ]
         [ el
@@ -284,6 +289,7 @@ viewHeader title =
                 { borders
                     | bottom = 2
                 }
+            , Region.heading 1
             ]
             (text title)
         ]
@@ -312,13 +318,20 @@ viewForm model =
             [ width fill ]
             [ el
                 [ Font.color colorColor
-                , Font.size 24
+                , Font.family [ Font.typeface "Poiret One" ]
+                , Font.bold
+                , Font.size 32
                 , Border.widthEach
                     { borders
                         | bottom = 2
                     }
+                , Region.heading 2
                 ]
                 (text "Einstellungen")
+            , el
+                [ height (px 30)
+                ]
+                none
             , row
                 [ width fill
                 , height fill
@@ -348,7 +361,8 @@ viewForm model =
                         Input.labelBelow
                             [ centerX
                             , Font.size 18
-                            , Font.family [ Font.monospace ]
+
+                            --, Font.family [ Font.monospace ]
                             ]
                             (text <| "Anzahl der Würfel: " ++ String.fromInt numberOfDice)
                     , min = 1.0
@@ -409,7 +423,8 @@ viewForm model =
                         Input.labelBelow
                             [ centerX
                             , Font.size 14
-                            , Font.family [ Font.monospace ]
+
+                            --, Font.family [ Font.monospace ]
                             , clip
                             ]
                             (column
@@ -434,7 +449,8 @@ viewForm model =
                             [ Border.width 2
                             , Background.color brightBackgroundColor
                             , Border.color colorColor
-                            , Font.family [ Font.monospace ]
+
+                            --, Font.family [ Font.monospace ]
                             , height fill
                             , width fill
                             ]
@@ -497,6 +513,11 @@ view model =
         , Border.widthXY 2 0
         , Border.color colorColor
         , Border.glow colorColor 1.0
+        , Font.family
+            [ Font.typeface "Sniglet"
+            , Font.sansSerif
+            ]
+        , Region.mainContent
         ]
         [ header
         , dice
