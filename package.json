@@ -1,0 +1,24 @@
+{
+  "name": "wuerfeling",
+  "version": "1.0.0",
+  "description": "Small web-app to simulate rolling dice.",
+  "main": "index.html",
+  "scripts": {
+    "build": "sh make.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bubens/Wuerfeling.git"
+  },
+  "author": "Henning P. Beyer <bubens@unpunk.de>",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/bubens/Wuerfeling/issues"
+  },
+  "homepage": "https://github.com/bubens/Wuerfeling#readme",
+  "devDependencies": {
+    "@types/elm": "^0.19.4",
+    "elm": "^0.19.1-6",
+    "terser": "^5.40.0"
+  }
+}
