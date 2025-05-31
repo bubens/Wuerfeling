@@ -6,22 +6,68 @@ import LineChart
 import LineChart.Area
 import LineChart.Axis
 import LineChart.Axis.Intersection
-import LineChart.Axis.Line
+import LineChart.Axis.Line as Line
 import LineChart.Axis.Range
-import LineChart.Axis.Tick
-import LineChart.Axis.Ticks
-import LineChart.Axis.Title
+import LineChart.Axis.Tick as Tick
+import LineChart.Axis.Ticks as Ticks
+import LineChart.Axis.Title as Title
 import LineChart.Axis.Values
-import LineChart.Colors
+import LineChart.Colors as Colors
 import LineChart.Container
 import LineChart.Dots
 import LineChart.Events
 import LineChart.Grid
 import LineChart.Interpolation
-import LineChart.Junk
+import LineChart.Junk as Junk
 import LineChart.Legends
 import LineChart.Line
+import Svg
 import Svg.Attributes
+
+
+guiColor =
+    Colors.grayLight
+
+
+customTick : Int -> Tick.Config msg
+customTick n =
+    Tick.custom
+        { position = toFloat n
+        , color = guiColor
+        , width = 3
+        , length = 7
+        , grid = True
+        , direction = Tick.negative
+        , label = Just (Junk.label guiColor (String.fromInt n))
+        }
+
+
+customAxisLine : Line.Config msg
+customAxisLine =
+    Line.custom
+        (\_ axisRange ->
+            { color = guiColor
+            , width = 5
+            , events = []
+            , start = axisRange.min
+            , end = axisRange.max
+            }
+        )
+
+
+customTitle : Float -> Float -> String -> Title.Config msg
+customTitle offsetX offsetY title =
+    Title.custom
+        (\_ { min, max } -> max)
+        offsetX
+        offsetY
+        (Svg.g
+            [ Svg.Attributes.color "rgb(192, 232, 249)"
+            , Svg.Attributes.fontWeight "200"
+            , Svg.Attributes.fontSize "20"
+            ]
+            [ Junk.label Colors.rust title ]
+        )
 
 
 render : Dict Int Int -> Element msg
@@ -34,23 +80,28 @@ render results =
         { x =
             LineChart.Axis.custom
                 { title =
-                    LineChart.Axis.Title.atAxisMax
-                        -40
-                        30
+                    customTitle
+                        -30
+                        18
                         "Augen"
                 , variable = Just << toFloat << Tuple.first
                 , pixels = 800
-                , range = LineChart.Axis.Range.default
+                , range =
+                    LineChart.Axis.Range.custom
+                        (\{ min, max } ->
+                            { min = min
+                            , max = max + max / 25
+                            }
+                        )
                 , axisLine =
-                    LineChart.Axis.Line.full
-                        LineChart.Colors.black
-                , ticks = LineChart.Axis.Ticks.int lenResults
+                    customAxisLine
+                , ticks = Ticks.intCustom lenResults customTick
                 }
         , y =
             LineChart.Axis.custom
                 { title =
-                    LineChart.Axis.Title.atAxisMax
-                        40
+                    customTitle
+                        30
                         0
                         "Anzahl"
                 , variable = Just << toFloat << Tuple.second
@@ -63,26 +114,27 @@ render results =
                             }
                         )
                 , axisLine =
-                    LineChart.Axis.Line.full
-                        LineChart.Colors.black
+                    customAxisLine
                 , ticks =
-                    LineChart.Axis.Ticks.custom
+                    Ticks.custom
                         (\range _ ->
                             LineChart.Axis.Values.int
                                 (LineChart.Axis.Values.around 5)
                                 { range | min = 0 }
-                                |> List.map LineChart.Axis.Tick.int
+                                |> List.map customTick
                         )
                 }
         , container =
             --LineChart.Container.spaced "line-chart" 40 40 40 80
             LineChart.Container.custom
                 { attributesHtml =
-                    [ Svg.Attributes.color "rgb(255, 255, 255)"
-
-                    --, Html.Attributes.style "margin-top" "20px"
+                    []
+                , attributesSvg =
+                    [ Svg.Attributes.fontSize "16"
+                    , Svg.Attributes.fontWeight "200"
+                    , Svg.Attributes.fontFamily "Sniglet"
+                    , Svg.Attributes.color "rgb(192, 232, 249)"
                     ]
-                , attributesSvg = []
                 , size = LineChart.Container.static
                 , margin = LineChart.Container.Margin 40 40 40 80
                 , id = "line-chart"
@@ -96,18 +148,18 @@ render results =
         , events =
             LineChart.Events.default
         , junk =
-            LineChart.Junk.default
+            Junk.default
         , grid =
             LineChart.Grid.lines
-                0.1
-                LineChart.Colors.black
+                0.3
+                guiColor
         , area =
             LineChart.Area.default
         , line =
             LineChart.Line.wider
-                3.0
+                5.0
         , dots =
             LineChart.Dots.default
         }
-        [ LineChart.line LineChart.Colors.rust LineChart.Dots.circle "Würfel" <| Dict.toList results ]
+        [ LineChart.line Colors.rust LineChart.Dots.circle "Würfel" <| Dict.toList results ]
         |> html
