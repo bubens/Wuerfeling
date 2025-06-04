@@ -21,9 +21,10 @@ import Url
 -- TYPES
 
 
-type Throws
-    = Setting
+type State
+    = Idle
     | Running Int Int
+    | Paused Int Int
 
 
 type Input
@@ -50,7 +51,7 @@ type Msg
     = Noop
     | DiceChanged Float
     | ThrowsChanged String
-    | StartSimulation
+    | StartPauseButtonPressed
     | DiceRolled (List Dice.Face)
     | Frame
 
@@ -60,7 +61,7 @@ type Msg
 
 
 type alias Model =
-    { status : Throws
+    { state : State
     , dice : List Dice.Dice
     , inputThrows : Input
     , results : Dict Int Int
@@ -135,7 +136,7 @@ initResults dice =
 
 init : flags -> Url.Url -> Navigation.Key -> ( Model, Cmd msg )
 init _ _ _ =
-    ( { status = Setting
+    ( { state = Idle
       , dice = List.singleton <| Dice.create
       , inputThrows = Valid "1"
       , results = initResults 1
@@ -188,9 +189,9 @@ update msg model =
             { model | inputThrows = input }
                 |> withCommand Cmd.none
 
-        StartSimulation ->
-            case model.status of
-                Setting ->
+        StartPauseButtonPressed ->
+            case model.state of
+                Idle ->
                     case model.inputThrows of
                         Valid str ->
                             let
@@ -198,14 +199,17 @@ update msg model =
                                     String.toInt str
                                         |> Maybe.withDefault 0
                             in
-                            { model | status = Running l 0 }
+                            { model | state = Running l 0 }
                                 |> withCommand Cmd.none
 
                         _ ->
                             ( model, Cmd.none )
 
-                Running _ _ ->
-                    ( model, Cmd.none )
+                Running end now ->
+                    ( { model | state = Paused end now }, Cmd.none )
+
+                Paused end now ->
+                    ( { model | state = Running end now }, Cmd.none )
 
         DiceRolled faces ->
             let
@@ -227,7 +231,7 @@ update msg model =
                         model.results
 
                 ( rollsExpected, rollsSoFar ) =
-                    case model.status of
+                    case model.state of
                         Running l i ->
                             ( l, i + 1 )
 
@@ -237,12 +241,12 @@ update msg model =
             { model
                 | dice = newDice
                 , results = newResult
-                , status = Running rollsExpected rollsSoFar
+                , state = Running rollsExpected rollsSoFar
             }
                 |> withCommand Cmd.none
 
         Frame ->
-            case model.status of
+            case model.state of
                 Running l i ->
                     if i < l then
                         let
@@ -252,10 +256,10 @@ update msg model =
                         ( model, Random.generate DiceRolled (nDiceRolls n) )
 
                     else
-                        { model | status = Setting }
+                        { model | state = Idle }
                             |> withCommand Cmd.none
 
-                Setting ->
+                _ ->
                     ( model, Cmd.none )
 
         Noop ->
@@ -300,14 +304,6 @@ viewForm model =
     let
         numberOfDice =
             List.length model.dice
-
-        isRunning =
-            case model.status of
-                Setting ->
-                    False
-
-                Running _ _ ->
-                    True
     in
     row
         [ width fill
@@ -352,7 +348,7 @@ viewForm model =
                     ]
                     { onChange =
                         \f ->
-                            if isRunning then
+                            if model.state /= Idle then
                                 Noop
 
                             else
@@ -403,7 +399,7 @@ viewForm model =
                     ]
                     { onChange =
                         \s ->
-                            if isRunning then
+                            if model.state /= Idle then
                                 Noop
 
                             else
@@ -434,38 +430,51 @@ viewForm model =
                                 ]
                             )
                     }
-                , Input.button
-                    [ width <| fillPortion 1
-                    , height <| px 40
-                    ]
-                    { onPress =
-                        if isRunning then
-                            Nothing
-
-                        else
-                            Just StartSimulation
-                    , label =
-                        el
-                            [ Border.width 2
-                            , Background.color brightBackgroundColor
-                            , Border.color colorColor
-
-                            --, Font.family [ Font.monospace ]
-                            , height fill
-                            , width fill
-                            ]
-                            (el
-                                [ width shrink
-                                , height shrink
-                                , centerX
-                                , centerY
-                                ]
-                                (text "Starten!")
-                            )
-                    }
+                , viewButton model
                 ]
             ]
         ]
+
+
+viewButton : Model -> Element Msg
+viewButton { state } =
+    let
+        buttonText =
+            case state of
+                Idle ->
+                    "Start!"
+
+                Running _ _ ->
+                    "Pause!"
+
+                Paused _ _ ->
+                    "Weiter!"
+    in
+    Input.button
+        [ width <| fillPortion 1
+        , height <| px 40
+        ]
+        { onPress =
+            Just StartPauseButtonPressed
+        , label =
+            el
+                [ Border.width 2
+                , Background.color brightBackgroundColor
+                , Border.color colorColor
+
+                --, Font.family [ Font.monospace ]
+                , height fill
+                , width fill
+                ]
+                (el
+                    [ width shrink
+                    , height shrink
+                    , centerX
+                    , centerY
+                    ]
+                    (text buttonText)
+                )
+        }
 
 
 viewDice : List Dice.Dice -> Element msg
@@ -538,11 +547,11 @@ view model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.status of
+    case model.state of
         Running _ _ ->
             onAnimationFrame <| always Frame
 
-        Setting ->
+        _ ->
             Sub.none
 
 
