@@ -50,7 +50,7 @@ type alias Directions =
 type Msg
     = Noop
     | DiceChanged Float
-    | ThrowsChanged String
+    | UpdateDiceThrowInput String
     | StartPauseButtonPressed
     | DiceRolled (List Dice.Face)
     | Frame
@@ -63,7 +63,7 @@ type Msg
 type alias Model =
     { state : State
     , dice : List Dice.Dice
-    , inputThrows : Input
+    , diceThrowInput : Input
     , results : Dict Int Int
     , title : String
     }
@@ -108,6 +108,11 @@ colorColor =
     rgb255 206 123 145
 
 
+orangeColor : Element.Color
+orangeColor =
+    rgb255 200 100 50
+
+
 borders : Directions
 borders =
     { top = 0
@@ -138,7 +143,7 @@ init : flags -> Url.Url -> Navigation.Key -> ( Model, Cmd msg )
 init _ _ _ =
     ( { state = Idle
       , dice = List.singleton <| Dice.create
-      , inputThrows = Valid "1"
+      , diceThrowInput = Valid "1"
       , results = initResults 1
       , title = "Würfeling"
       }
@@ -164,7 +169,7 @@ update msg model =
             }
                 |> withCommand Cmd.none
 
-        ThrowsChanged val ->
+        UpdateDiceThrowInput val ->
             let
                 isEmpty =
                     if String.length val == 0 then
@@ -186,13 +191,13 @@ update msg model =
                     else
                         Invalid val
             in
-            { model | inputThrows = input }
+            { model | diceThrowInput = input }
                 |> withCommand Cmd.none
 
         StartPauseButtonPressed ->
             case model.state of
                 Idle ->
-                    case model.inputThrows of
+                    case model.diceThrowInput of
                         Valid str ->
                             let
                                 l =
@@ -301,14 +306,12 @@ viewHeader title =
 
 viewForm : Model -> Element Msg
 viewForm model =
-    let
-        numberOfDice =
-            List.length model.dice
-    in
     row
         [ width fill
         , padding 20
         , Font.color textColor
+
+        --, Element.explain Debug.todo
         ]
         [ column
             [ width fill ]
@@ -332,112 +335,179 @@ viewForm model =
                 [ width fill
                 , height fill
                 , spacing 20
+
+                --, Element.explain Debug.todo
                 ]
-                [ Input.slider
-                    [ width <| fillPortion 2
-                    , behindContent
-                        (el
-                            [ width fill
-                            , height (px 4)
-                            , centerY
-                            , Background.color colorColor
-                            , Border.rounded 2
-                            ]
-                            none
-                        )
-                    ]
-                    { onChange =
-                        \f ->
-                            if model.state /= Idle then
-                                Noop
-
-                            else
-                                DiceChanged f
-                    , label =
-                        Input.labelBelow
-                            [ centerX
-                            , Font.size 18
-
-                            --, Font.family [ Font.monospace ]
-                            ]
-                            (text <| "Anzahl der Würfel: " ++ String.fromInt numberOfDice)
-                    , min = 1.0
-                    , max = 8.0
-                    , value = toFloat numberOfDice
-                    , step = Just 1.0
-                    , thumb =
-                        Input.thumb
-                            [ width <| px 16
-                            , height <| px 16
-                            , centerY
-                            , Background.color brightBackgroundColor
-                            , Border.rounded 8
-                            ]
-                    }
-                , Input.text
-                    [ width <| fillPortion 1
-                    , Font.color colorColor
-                    , Border.color
-                        (case model.inputThrows of
-                            Valid _ ->
-                                colorColor
-
-                            _ ->
-                                rgb255 255 0 0
-                        )
-                    , Border.glow
-                        (rgb255 255 0 0)
-                        (case model.inputThrows of
-                            Valid _ ->
-                                0.0
-
-                            _ ->
-                                3.0
-                        )
-                    , Border.width 2
-                    , centerX
-                    ]
-                    { onChange =
-                        \s ->
-                            if model.state /= Idle then
-                                Noop
-
-                            else
-                                ThrowsChanged s
-                    , text =
-                        case model.inputThrows of
-                            Empty ->
-                                ""
-
-                            Valid str ->
-                                str
-
-                            Invalid str ->
-                                str
-                    , placeholder = Nothing
-                    , label =
-                        Input.labelBelow
-                            [ centerX
-                            , Font.size 14
-
-                            --, Font.family [ Font.monospace ]
-                            , clip
-                            ]
-                            (column
-                                []
-                                [ el [ centerX ] (text "Anzahl der Würfe")
-                                , el [ centerX ] (text "(1 - 9999)")
-                                ]
-                            )
-                    }
-                , viewButton model
+                [ viewSlider 2 model
+                , viewTextInput 1 model
+                , viewCounter 1 model
+                , viewButton 1 model
                 ]
             ]
         ]
 
 
-viewButton : Model -> Element Msg
-viewButton { state } =
+viewCounter : Int -> Model -> Element msg
+viewCounter portion model =
+    let
+        counterText =
+            case model.state of
+                Running _ current ->
+                    String.fromInt current
+
+                Paused _ current ->
+                    String.fromInt current
+
+                Idle ->
+                    "___"
+    in
+    column
+        [ width <| fillPortion portion
+        , height fill
+        , alignTop
+        , spacingXY 0 4
+        ]
+        [ el
+            [ Font.color textColor
+            , Font.size 14
+            , Region.heading 3
+            ]
+            (text "Fortschritt:")
+        , row
+            [ width fill ]
+            [ el [ width <| fillPortion 1 ]
+                none
+            , el
+                [ width <| fillPortion 8
+                , height <| px 43
+                , paddingXY 0 12
+                , Font.family [ Font.typeface "Doto", Font.monospace ]
+                , Font.bold
+                , Font.size 24
+                , Font.color darkBackgroundColor
+                , Font.letterSpacing 5
+                , Font.center
+                , Background.color orangeColor
+                , Border.color colorColor
+                , Border.rounded 5
+                , Border.width 2
+                ]
+                (text counterText)
+            , el [ width <| fillPortion 1 ] none
+            ]
+        ]
+
+
+viewTextInput : Int -> Model -> Element Msg
+viewTextInput portion model =
+    Input.text
+        [ width <| fillPortion portion
+        , Font.color colorColor
+        , Border.color
+            (case model.diceThrowInput of
+                Valid _ ->
+                    colorColor
+
+                _ ->
+                    rgb255 255 0 0
+            )
+        , Border.glow
+            (rgb255 255 0 0)
+            (case model.diceThrowInput of
+                Valid _ ->
+                    0.0
+
+                _ ->
+                    3.0
+            )
+        , Border.width 2
+        , centerX
+        , alignTop
+        ]
+        { onChange =
+            \s ->
+                if model.state /= Idle then
+                    Noop
+
+                else
+                    UpdateDiceThrowInput s
+        , text =
+            case model.diceThrowInput of
+                Empty ->
+                    ""
+
+                Valid str ->
+                    str
+
+                Invalid str ->
+                    str
+        , placeholder = Nothing
+        , label =
+            Input.labelAbove
+                [ Font.size 14
+                , alignLeft
+                , Region.heading 3
+                ]
+                (el [ centerX ] (text "Anzahl der Würfe:"))
+        }
+
+
+viewSlider : Int -> Model -> Element Msg
+viewSlider portion { dice, state } =
+    let
+        numberOfDice =
+            List.length dice
+    in
+    Input.slider
+        [ width <| fillPortion portion
+        , alignTop
+        , height fill
+        , behindContent
+            (el
+                [ width fill
+                , height (px 4)
+                , centerY
+                , Background.color colorColor
+                , Border.rounded 4
+                ]
+                none
+            )
+        ]
+        { onChange =
+            \f ->
+                if state /= Idle then
+                    Noop
+
+                else
+                    DiceChanged f
+        , label =
+            Input.labelAbove
+                [ alignLeft
+                , Font.size 14
+                ]
+            <|
+                row
+                    [ Region.heading 3 ]
+                    [ el [] (text "Anzahl der Würfe: ")
+                    , el [ Font.color orangeColor, Font.bold ] (text <| String.fromInt numberOfDice)
+                    ]
+        , min = 1.0
+        , max = 8.0
+        , value = toFloat numberOfDice
+        , step = Just 1.0
+        , thumb =
+            Input.thumb
+                [ width <| px 16
+                , height <| px 16
+                , centerY
+                , Background.color brightBackgroundColor
+                , Border.rounded 8
+                ]
+        }
+
+
+viewButton : Int -> Model -> Element Msg
+viewButton portion { state } =
     let
         buttonText =
             case state of
@@ -451,8 +521,9 @@ viewButton { state } =
                     "Weiter!"
     in
     Input.button
-        [ width <| fillPortion 1
+        [ width <| fillPortion portion
         , height <| px 40
+        , centerX
         ]
         { onPress =
             Just StartPauseButtonPressed
