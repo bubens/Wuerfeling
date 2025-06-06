@@ -275,8 +275,8 @@ update msg model =
 -- VIEW
 
 
-viewHeader : String -> Element msg
-viewHeader title =
+viewHeader : Model -> Element msg
+viewHeader { title } =
     row
         [ Font.size 42
         , Font.color colorColor
@@ -548,8 +548,8 @@ viewButton portion { state } =
         }
 
 
-viewDice : List Dice.Dice -> Element msg
-viewDice dice =
+viewDice : Model -> Element msg
+viewDice { dice } =
     row
         [ height <| px 120
         , width fill
@@ -573,20 +573,11 @@ viewDice dice =
 view : Model -> Document Msg
 view model =
     let
-        header =
-            viewHeader model.title
-
-        dice =
-            viewDice model.dice
-
-        chart =
-            Chart.render model.results
-
-        form =
-            viewForm model
+        w =
+            1028
     in
     column
-        [ width <| px 840
+        [ width <| px w
         , height <| fill
         , Background.color darkBackgroundColor
         , centerX
@@ -599,10 +590,13 @@ view model =
             ]
         , Region.mainContent
         ]
-        [ header
-        , dice
-        , chart
-        , form
+        [ viewHeader model
+        , viewDice model
+        , Chart.render
+            (w - 40)
+            (round (w / 3))
+            model.results
+        , viewForm model
         ]
         |> Element.layout
             [ Background.color brightBackgroundColor

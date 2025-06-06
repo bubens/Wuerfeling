@@ -58,7 +58,7 @@ customAxisLine =
 customTitle : Float -> Float -> String -> Title.Config msg
 customTitle offsetX offsetY title =
     Title.custom
-        (\_ { min, max } -> max)
+        (\_ { max } -> max)
         offsetX
         offsetY
         (Svg.g
@@ -70,8 +70,8 @@ customTitle offsetX offsetY title =
         )
 
 
-render : Dict Int Int -> Element msg
-render results =
+render : Int -> Int -> Dict Int Int -> Element msg
+render w h results =
     let
         lenResults =
             Dict.size results
@@ -85,12 +85,12 @@ render results =
                         18
                         "Augen"
                 , variable = Just << toFloat << Tuple.first
-                , pixels = 800
+                , pixels = w
                 , range =
                     LineChart.Axis.Range.custom
                         (\{ min, max } ->
                             { min = min
-                            , max = max + max / 25
+                            , max = max + max / 30
                             }
                         )
                 , axisLine =
@@ -105,10 +105,10 @@ render results =
                         0
                         "Anzahl"
                 , variable = Just << toFloat << Tuple.second
-                , pixels = 300
+                , pixels = h
                 , range =
                     LineChart.Axis.Range.custom
-                        (\{ min, max } ->
+                        (\{ max } ->
                             { min = 0
                             , max = max + max / 10
                             }
