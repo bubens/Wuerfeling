@@ -105,7 +105,7 @@ render w h results =
                         0
                         "Anzahl"
                 , variable = Just << toFloat << Tuple.second
-                , pixels = h
+                , pixels = h + 6
                 , range =
                     LineChart.Axis.Range.custom
                         (\{ max } ->

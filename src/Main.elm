@@ -9,10 +9,12 @@ import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
+import Element.Events as Events
 import Element.Font as Font
 import Element.Input as Input
 import Element.Region as Region
 import Html exposing (Html)
+import Html.Attributes
 import Random
 import Url
 
@@ -31,6 +33,11 @@ type Input
     = Empty
     | Valid String
     | Invalid String
+
+
+type Representation
+    = Chart
+    | Table
 
 
 type alias Document msg =
@@ -54,6 +61,7 @@ type Msg
     | StartPauseButtonPressed
     | DiceRolled (List Dice.Face)
     | Frame
+    | SwitchRepresentation Representation
 
 
 
@@ -66,6 +74,7 @@ type alias Model =
     , diceThrowInput : Input
     , results : Dict Int Int
     , title : String
+    , currentRepresentation : Representation
     }
 
 
@@ -146,6 +155,7 @@ init _ _ _ =
       , diceThrowInput = Valid "1"
       , results = initResults 1
       , title = "Würfeling"
+      , currentRepresentation = Chart
       }
     , Cmd.none
     )
@@ -266,6 +276,9 @@ update msg model =
 
                 _ ->
                     ( model, Cmd.none )
+
+        SwitchRepresentation representation ->
+            ( { model | currentRepresentation = representation }, Cmd.none )
 
         Noop ->
             ( model, Cmd.none )
@@ -570,6 +583,260 @@ viewDice { dice } =
         )
 
 
+toPrecision : Float -> Float -> Float
+toPrecision prec x =
+    let
+        exp =
+            10 ^ prec
+    in
+    (toFloat << round)
+        (x * exp)
+        / exp
+
+
+viewTable : Int -> Int -> Model -> Element msg
+viewTable w h { results, state } =
+    let
+        cellWidth =
+            65
+
+        role =
+            \r ->
+                Html.Attributes.attribute "role" r
+                    |> htmlAttribute
+
+        cellAttributes =
+            \rl ->
+                [ role rl
+                , height fill
+                , centerX
+                ]
+
+        columnAttributes =
+            \cw rl ->
+                [ role rl
+                , width cw
+                , alignTop
+                , Border.color textColor
+                , Border.width 1
+                , padding 13
+                , spacing 6
+                ]
+
+        columns =
+            Dict.foldr
+                (\k v l ->
+                    let
+                        max =
+                            case state of
+                                Idle ->
+                                    0.0
+
+                                Paused _ m ->
+                                    toFloat m
+
+                                Running _ m ->
+                                    toFloat m
+
+                        percent =
+                            if max == 0 then
+                                "0"
+
+                            else
+                                (toFloat v / max)
+                                    * 100
+                                    |> toPrecision 1
+                                    |> String.fromFloat
+                    in
+                    column
+                        (columnAttributes (px cellWidth) "column")
+                        [ el
+                            (List.append
+                                [ Font.color orangeColor
+
+                                --, Background.color brightBackgroundColor
+                                ]
+                                (cellAttributes "columnheader")
+                            )
+                            (text <| String.fromInt k)
+                        , el
+                            (cellAttributes "cell")
+                            (text <| String.fromInt v)
+                        , el
+                            (cellAttributes "cell")
+                            (text <| percent ++ "%")
+                        ]
+                        :: l
+                )
+                []
+                results
+    in
+    el
+        [ width <| px w
+        , height <| px h
+
+        --, explain Debug.todo
+        , centerX
+        , paddingXY 0 12
+        ]
+        (wrappedRow
+            [ role "table"
+
+            --, width fill
+            , height fill
+            , centerX
+            , centerY
+            , Font.size 16
+            ]
+            (column
+                (List.append
+                    [ Font.color orangeColor
+                    ]
+                    (columnAttributes
+                        (px <| cellWidth + 20)
+                        "column"
+                    )
+                )
+                [ el
+                    (cellAttributes "rowheader")
+                    (text "Augen")
+                , el
+                    (cellAttributes "rowheader")
+                    (text "Anzahl")
+                , el
+                    (cellAttributes "rowheader")
+                    (text "Prozent")
+                ]
+                :: columns
+            )
+        )
+
+
+viewRepresentation : Float -> Model -> Element msg
+viewRepresentation w model =
+    case model.currentRepresentation of
+        Chart ->
+            Chart.render
+                (round (w - 40))
+                (round (w / 3))
+                model.results
+
+        Table ->
+            viewTable
+                (round (w - 40))
+                (round (w / 3))
+                model
+
+
+viewRepresentationSwitch : Int -> Model -> Element Msg
+viewRepresentationSwitch w { currentRepresentation } =
+    let
+        borderWidth =
+            2
+
+        deadSpace =
+            el
+                [ width <| px 6
+                , height fill
+                , Border.widthEach
+                    { top = 0
+                    , left = 0
+                    , right = 0
+                    , bottom = borderWidth
+                    }
+                ]
+                none
+    in
+    row
+        [ Font.size 16
+        , width <| px (w - 40)
+        , centerX
+        ]
+        [ deadSpace
+        , el
+            [ Events.onClick <| SwitchRepresentation Chart
+            , Background.color
+                (if currentRepresentation == Chart then
+                    darkBackgroundColor
+
+                 else
+                    brightBackgroundColor
+                )
+            , Border.color textColor
+            , Border.widthEach
+                { top = borderWidth
+                , right = borderWidth
+                , left = borderWidth
+                , bottom =
+                    if currentRepresentation == Chart then
+                        0
+
+                    else
+                        borderWidth
+                }
+            , Border.roundEach
+                { topLeft = 3
+                , topRight = 3
+                , bottomLeft = 0
+                , bottomRight = 0
+                }
+            , padding 6
+            ]
+            (text "Diagramm")
+        , el
+            [ width <| px 4
+            , height fill
+            , Border.widthEach
+                { top = 0
+                , left = 0
+                , right = 0
+                , bottom = borderWidth
+                }
+            ]
+            none
+        , el
+            [ Events.onClick <| SwitchRepresentation Table
+            , Border.widthEach
+                { top = borderWidth
+                , right = borderWidth
+                , left = borderWidth
+                , bottom =
+                    if currentRepresentation == Table then
+                        0
+
+                    else
+                        borderWidth
+                }
+            , Border.roundEach
+                { topLeft = 3
+                , topRight = 3
+                , bottomLeft = 0
+                , bottomRight = 0
+                }
+            , Background.color
+                (if currentRepresentation == Table then
+                    darkBackgroundColor
+
+                 else
+                    brightBackgroundColor
+                )
+            , padding 6
+            ]
+            (text "Tabelle")
+        , el
+            [ width fill
+            , height fill
+            , Border.widthEach
+                { top = 0
+                , left = 0
+                , right = 0
+                , bottom = borderWidth
+                }
+            ]
+            none
+        ]
+
+
 view : Model -> Document Msg
 view model =
     let
@@ -592,10 +859,8 @@ view model =
         ]
         [ viewHeader model
         , viewDice model
-        , Chart.render
-            (w - 40)
-            (round (w / 3))
-            model.results
+        , viewRepresentationSwitch w model
+        , viewRepresentation w model
         , viewForm model
         ]
         |> Element.layout
