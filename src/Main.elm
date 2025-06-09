@@ -27,6 +27,7 @@ type State
     = Idle
     | Running Int Int
     | Paused Int Int
+    | Done Int
 
 
 type Input
@@ -62,6 +63,7 @@ type Msg
     | DiceRolled (List Dice.Face)
     | Frame
     | SwitchRepresentation Representation
+    | CancelSimulation
 
 
 
@@ -172,37 +174,55 @@ update msg model =
             let
                 diceCount =
                     round val
+
+                newModel =
+                    case model.state of
+                        Idle ->
+                            { model
+                                | dice = List.repeat diceCount Dice.create
+                                , results = initResults diceCount
+                            }
+
+                        Done _ ->
+                            { model
+                                | dice = List.repeat diceCount Dice.create
+                                , results = initResults diceCount
+                                , state = Idle
+                            }
+
+                        _ ->
+                            model
             in
-            { model
-                | dice = List.repeat diceCount Dice.create
-                , results = initResults diceCount
-            }
-                |> withCommand Cmd.none
+            ( newModel, Cmd.none )
 
         UpdateDiceThrowInput val ->
             let
-                isEmpty =
-                    if String.length val == 0 then
-                        True
-
-                    else
-                        False
-
-                isNumeric =
-                    String.all Char.isDigit val
-
-                input =
-                    if isEmpty then
+                input v =
+                    if String.length v == 0 then
                         Empty
 
-                    else if isNumeric then
-                        Valid val
+                    else if String.all Char.isDigit v then
+                        Valid v
 
                     else
-                        Invalid val
+                        Invalid v
+
+                newModel =
+                    case model.state of
+                        Idle ->
+                            { model | diceThrowInput = input val }
+
+                        Done _ ->
+                            { model
+                                | diceThrowInput = input val
+                                , state = Idle
+                                , results = initResults (List.length model.dice)
+                            }
+
+                        _ ->
+                            model
             in
-            { model | diceThrowInput = input }
-                |> withCommand Cmd.none
+            ( newModel, Cmd.none )
 
         StartPauseButtonPressed ->
             case model.state of
@@ -225,6 +245,14 @@ update msg model =
 
                 Paused end now ->
                     ( { model | state = Running end now }, Cmd.none )
+
+                Done end ->
+                    ( { model
+                        | state = Running end 0
+                        , results = initResults (List.length model.dice)
+                      }
+                    , Cmd.none
+                    )
 
         DiceRolled faces ->
             let
@@ -262,8 +290,8 @@ update msg model =
 
         Frame ->
             case model.state of
-                Running l i ->
-                    if i < l then
+                Running end now ->
+                    if now < end then
                         let
                             n =
                                 List.length model.dice
@@ -271,14 +299,21 @@ update msg model =
                         ( model, Random.generate DiceRolled (nDiceRolls n) )
 
                     else
-                        { model | state = Idle }
-                            |> withCommand Cmd.none
+                        ( { model | state = Done end }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
         SwitchRepresentation representation ->
             ( { model | currentRepresentation = representation }, Cmd.none )
+
+        CancelSimulation ->
+            ( { model
+                | state = Idle
+                , results = initResults (List.length model.dice)
+              }
+            , Cmd.none
+            )
 
         Noop ->
             ( model, Cmd.none )
@@ -365,14 +400,17 @@ viewCounter portion model =
     let
         counterText =
             case model.state of
-                Running _ current ->
-                    String.fromInt current
+                Running _ now ->
+                    String.fromInt now
 
-                Paused _ current ->
-                    String.fromInt current
+                Paused _ now ->
+                    String.fromInt now
 
                 Idle ->
                     "___"
+
+                Done end ->
+                    String.fromInt end
     in
     column
         [ width <| fillPortion portion
@@ -438,12 +476,7 @@ viewTextInput portion model =
         , alignTop
         ]
         { onChange =
-            \s ->
-                if model.state /= Idle then
-                    Noop
-
-                else
-                    UpdateDiceThrowInput s
+            UpdateDiceThrowInput
         , text =
             case model.diceThrowInput of
                 Empty ->
@@ -487,12 +520,7 @@ viewSlider portion { dice, state } =
             )
         ]
         { onChange =
-            \f ->
-                if state /= Idle then
-                    Noop
-
-                else
-                    DiceChanged f
+            DiceChanged
         , label =
             Input.labelAbove
                 [ alignLeft
@@ -532,33 +560,49 @@ viewButton portion { state } =
 
                 Paused _ _ ->
                     "Weiter!"
-    in
-    Input.button
-        [ width <| fillPortion portion
-        , height <| px 40
-        , centerX
-        ]
-        { onPress =
-            Just StartPauseButtonPressed
-        , label =
-            el
-                [ Border.width 2
-                , Background.color brightBackgroundColor
-                , Border.color colorColor
 
-                --, Font.family [ Font.monospace ]
-                , height fill
-                , width fill
-                ]
-                (el
-                    [ width shrink
-                    , height shrink
-                    , centerX
-                    , centerY
+                Done _ ->
+                    "Nochmal!"
+    in
+    column
+        [ width <| fillPortion portion
+        , spacing 3
+        ]
+        [ Input.button
+            [ height <| px 40
+            , width fill
+            , centerX
+            ]
+            { onPress =
+                Just StartPauseButtonPressed
+            , label =
+                el
+                    [ Border.width 2
+                    , Background.color brightBackgroundColor
+                    , Border.color colorColor
+
+                    --, Font.family [ Font.monospace ]
+                    , height fill
+                    , width fill
                     ]
-                    (text buttonText)
-                )
-        }
+                    (el
+                        [ width shrink
+                        , height shrink
+                        , centerX
+                        , centerY
+                        ]
+                        (text buttonText)
+                    )
+            }
+        , el
+            [ Font.size 12
+            , pointer
+            , centerX
+            , Font.variant Font.smallCaps
+            , Events.onClick CancelSimulation
+            ]
+            (text "(Simulation abbrechen)")
+        ]
 
 
 viewDice : Model -> Element msg
@@ -619,8 +663,8 @@ viewTable w h { results, state } =
                 , alignTop
                 , Border.color textColor
                 , Border.width 1
-                , padding 13
-                , spacing 6
+                , spacing 12
+                , padding 6
                 ]
 
         columns =
@@ -636,6 +680,9 @@ viewTable w h { results, state } =
                                     toFloat m
 
                                 Running _ m ->
+                                    toFloat m
+
+                                Done m ->
                                     toFloat m
 
                         percent =
@@ -674,19 +721,15 @@ viewTable w h { results, state } =
     el
         [ width <| px w
         , height <| px h
-
-        --, explain Debug.todo
         , centerX
-        , paddingXY 0 12
         ]
         (wrappedRow
             [ role "table"
-
-            --, width fill
             , height fill
             , centerX
             , centerY
             , Font.size 16
+            , paddingXY 0 12
             ]
             (column
                 (List.append
@@ -712,20 +755,30 @@ viewTable w h { results, state } =
         )
 
 
-viewRepresentation : Float -> Model -> Element msg
+viewRepresentation : Float -> Model -> Element Msg
 viewRepresentation w model =
-    case model.currentRepresentation of
-        Chart ->
-            Chart.render
-                (round (w - 40))
-                (round (w / 3))
-                model.results
+    let
+        representation =
+            case model.currentRepresentation of
+                Chart ->
+                    Chart.render
+                        (round (w - 40))
+                        (round (w / 3))
+                        model.results
 
-        Table ->
-            viewTable
-                (round (w - 40))
-                (round (w / 3))
-                model
+                Table ->
+                    viewTable
+                        (round (w - 40))
+                        (round (w / 3))
+                        model
+    in
+    column
+        [ spacing 6
+        , width <| px (round w)
+        ]
+        [ viewRepresentationSwitch (round w) model
+        , representation
+        ]
 
 
 viewRepresentationSwitch : Int -> Model -> Element Msg
@@ -781,6 +834,7 @@ viewRepresentationSwitch w { currentRepresentation } =
                 , bottomRight = 0
                 }
             , padding 6
+            , pointer
             ]
             (text "Diagramm")
         , el
@@ -821,6 +875,7 @@ viewRepresentationSwitch w { currentRepresentation } =
                     brightBackgroundColor
                 )
             , padding 6
+            , pointer
             ]
             (text "Tabelle")
         , el
@@ -859,7 +914,6 @@ view model =
         ]
         [ viewHeader model
         , viewDice model
-        , viewRepresentationSwitch w model
         , viewRepresentation w model
         , viewForm model
         ]
