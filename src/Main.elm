@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import Array exposing (Array)
 import Browser exposing (Document)
 import Browser.Events exposing (onAnimationFrame)
 import Browser.Navigation as Navigation
@@ -70,11 +71,17 @@ type Msg
 -- MODEL
 
 
-type alias Model =
-    { state : State
-    , dice : List Dice.Dice
-    , diceThrowInput : Input
+type alias Simulation =
+    { dice : List Dice.Dice
+    , state : State
     , results : Dict Int Int
+    }
+
+
+type alias Model =
+    { simulations : Dict Int Simulation
+    , currentSimulation : Int
+    , diceThrowInput : Input
     , title : String
     , currentRepresentation : Representation
     }
@@ -84,14 +91,50 @@ type alias Model =
 -- UTILS
 
 
-leftOf : b -> a -> ( a, b )
-leftOf right left =
-    ( left, right )
+getSimulation : Int -> Dict Int Simulation -> Simulation
+getSimulation n simulations =
+    if Dict.member n simulations then
+        Dict.get n simulations
+            |> Maybe.withDefault
+                (Simulation
+                    [ Dice.create ]
+                    Idle
+                    (initResults 1)
+                )
+
+    else
+        Simulation
+            [ Dice.create ]
+            Idle
+            (initResults 1)
 
 
-withCommand : Cmd Msg -> Model -> ( Model, Cmd Msg )
-withCommand =
-    leftOf
+setSimulation : Simulation -> Dict Int Simulation -> Dict Int Simulation
+setSimulation newSimulation simulations =
+    Dict.map
+        (\i sim ->
+            let
+                n =
+                    List.length newSimulation.dice
+            in
+            if i == n then
+                newSimulation
+
+            else
+                sim
+        )
+        simulations
+
+
+toPrecision : Float -> Float -> Float
+toPrecision prec x =
+    let
+        exp =
+            10 ^ prec
+    in
+    (toFloat << round)
+        (x * exp)
+        / exp
 
 
 withTitle : String -> List (Html msg) -> Document msg
@@ -133,6 +176,10 @@ borders =
     }
 
 
+
+-- RANDOM-GENERATOR
+
+
 nDiceRolls : Int -> Random.Generator (List Dice.Face)
 nDiceRolls n =
     Random.list n Dice.generateRandomFace
@@ -150,12 +197,26 @@ initResults dice =
         |> Dict.fromList
 
 
+initSimulations : Dict Int Simulation
+initSimulations =
+    List.range 1 8
+        |> List.map
+            (\n ->
+                ( n
+                , Simulation
+                    (List.repeat n Dice.create)
+                    Idle
+                    (initResults n)
+                )
+            )
+        |> Dict.fromList
+
+
 init : flags -> Url.Url -> Navigation.Key -> ( Model, Cmd msg )
 init _ _ _ =
-    ( { state = Idle
-      , dice = List.singleton <| Dice.create
+    ( { simulations = initSimulations
+      , currentSimulation = 1
       , diceThrowInput = Valid "1"
-      , results = initResults 1
       , title = "Würfeling"
       , currentRepresentation = Chart
       }
@@ -173,133 +234,139 @@ update msg model =
         DiceChanged val ->
             let
                 diceCount =
-                    round val
+                    if val < 1 then
+                        1
 
-                newModel =
-                    case model.state of
-                        Idle ->
-                            { model
-                                | dice = List.repeat diceCount Dice.create
-                                , results = initResults diceCount
-                            }
+                    else if val > 8 then
+                        8
 
-                        Done _ ->
-                            { model
-                                | dice = List.repeat diceCount Dice.create
-                                , results = initResults diceCount
-                                , state = Idle
-                            }
-
-                        _ ->
-                            model
+                    else
+                        round val
             in
-            ( newModel, Cmd.none )
+            ( { model | currentSimulation = diceCount }, Cmd.none )
 
         UpdateDiceThrowInput val ->
             let
-                input v =
-                    if String.length v == 0 then
+                input =
+                    if String.length val == 0 then
                         Empty
 
-                    else if String.all Char.isDigit v then
-                        Valid v
+                    else if String.all Char.isDigit val then
+                        Valid val
 
                     else
-                        Invalid v
-
-                newModel =
-                    case model.state of
-                        Idle ->
-                            { model | diceThrowInput = input val }
-
-                        Done _ ->
-                            { model
-                                | diceThrowInput = input val
-                                , state = Idle
-                                , results = initResults (List.length model.dice)
-                            }
-
-                        _ ->
-                            model
+                        Invalid val
             in
-            ( newModel, Cmd.none )
+            ( { model | diceThrowInput = input }, Cmd.none )
 
         StartPauseButtonPressed ->
-            case model.state of
-                Idle ->
-                    case model.diceThrowInput of
-                        Valid str ->
-                            let
-                                l =
-                                    String.toInt str
-                                        |> Maybe.withDefault 0
-                            in
-                            { model | state = Running l 0 }
-                                |> withCommand Cmd.none
+            let
+                currentSimulation =
+                    getSimulation model.currentSimulation model.simulations
 
-                        _ ->
-                            ( model, Cmd.none )
+                updatedCurrentSimulation =
+                    case currentSimulation.state of
+                        Idle ->
+                            case model.diceThrowInput of
+                                Valid str ->
+                                    let
+                                        l =
+                                            String.toInt str
+                                                |> Maybe.withDefault 0
+                                    in
+                                    { currentSimulation | state = Running l 0 }
 
-                Running end now ->
-                    ( { model | state = Paused end now }, Cmd.none )
+                                _ ->
+                                    currentSimulation
 
-                Paused end now ->
-                    ( { model | state = Running end now }, Cmd.none )
+                        Running end now ->
+                            { currentSimulation | state = Paused end now }
 
-                Done end ->
-                    ( { model
-                        | state = Running end 0
-                        , results = initResults (List.length model.dice)
-                      }
-                    , Cmd.none
-                    )
+                        Paused end now ->
+                            { currentSimulation | state = Running end now }
+
+                        Done end ->
+                            { currentSimulation
+                                | state = Running end 0
+                                , results = initResults (List.length currentSimulation.dice)
+                            }
+            in
+            ( { model
+                | simulations =
+                    setSimulation
+                        updatedCurrentSimulation
+                        model.simulations
+              }
+            , Cmd.none
+            )
 
         DiceRolled faces ->
             let
+                currentSimulation =
+                    getSimulation model.currentSimulation model.simulations
+
                 newDice =
                     List.map2
                         Dice.roll
                         faces
-                        model.dice
+                        currentSimulation.dice
 
                 sumOfDice =
                     newDice
                         |> List.map Dice.toInt
                         |> List.sum
 
-                newResult =
+                newResults =
                     Dict.update
                         sumOfDice
                         (Maybe.map <| (+) 1)
-                        model.results
+                        currentSimulation.results
 
                 ( rollsExpected, rollsSoFar ) =
-                    case model.state of
+                    case currentSimulation.state of
                         Running l i ->
                             ( l, i + 1 )
 
                         _ ->
                             ( 0, 0 )
+
+                updatedCurrentSimulation =
+                    Simulation
+                        newDice
+                        (Running rollsExpected rollsSoFar)
+                        newResults
             in
-            { model
-                | dice = newDice
-                , results = newResult
-                , state = Running rollsExpected rollsSoFar
-            }
-                |> withCommand Cmd.none
+            ( { model
+                | simulations = setSimulation updatedCurrentSimulation model.simulations
+              }
+            , Cmd.none
+            )
 
         Frame ->
-            case model.state of
+            let
+                currentSimulation =
+                    getSimulation model.currentSimulation model.simulations
+            in
+            case currentSimulation.state of
                 Running end now ->
                     if now < end then
                         let
                             n =
-                                List.length model.dice
+                                List.length currentSimulation.dice
                         in
                         ( model, Random.generate DiceRolled (nDiceRolls n) )
 
                     else
-                        ( { model | state = Done end }, Cmd.none )
+                        let
+                            updatedCurretSimulation =
+                                { currentSimulation | state = Done end }
+                        in
+                        ( { model
+                            | simulations =
+                                setSimulation updatedCurretSimulation model.simulations
+                          }
+                        , Cmd.none
+                        )
 
                 _ ->
                     ( model, Cmd.none )
@@ -308,9 +375,19 @@ update msg model =
             ( { model | currentRepresentation = representation }, Cmd.none )
 
         CancelSimulation ->
+            let
+                currentSimulation =
+                    getSimulation model.currentSimulation model.simulations
+
+                updatedCurrentSimulation =
+                    { currentSimulation
+                        | state = Idle
+                        , results = initResults (List.length currentSimulation.dice)
+                    }
+            in
             ( { model
-                | state = Idle
-                , results = initResults (List.length model.dice)
+                | simulations =
+                    setSimulation updatedCurrentSimulation model.simulations
               }
             , Cmd.none
             )
@@ -398,8 +475,11 @@ viewForm model =
 viewCounter : Int -> Model -> Element msg
 viewCounter portion model =
     let
+        currentSimulation =
+            getSimulation model.currentSimulation model.simulations
+
         counterText =
-            case model.state of
+            case currentSimulation.state of
                 Running _ now ->
                     String.fromInt now
 
@@ -499,8 +579,11 @@ viewTextInput portion model =
 
 
 viewSlider : Int -> Model -> Element Msg
-viewSlider portion { dice, state } =
+viewSlider portion model =
     let
+        { dice } =
+            getSimulation model.currentSimulation model.simulations
+
         numberOfDice =
             List.length dice
     in
@@ -548,8 +631,11 @@ viewSlider portion { dice, state } =
 
 
 viewButton : Int -> Model -> Element Msg
-viewButton portion { state } =
+viewButton portion model =
     let
+        { state } =
+            getSimulation model.currentSimulation model.simulations
+
         buttonText =
             case state of
                 Idle ->
@@ -606,7 +692,11 @@ viewButton portion { state } =
 
 
 viewDice : Model -> Element msg
-viewDice { dice } =
+viewDice model =
+    let
+        { dice } =
+            getSimulation model.currentSimulation model.simulations
+    in
     row
         [ height <| px 120
         , width fill
@@ -627,20 +717,12 @@ viewDice { dice } =
         )
 
 
-toPrecision : Float -> Float -> Float
-toPrecision prec x =
-    let
-        exp =
-            10 ^ prec
-    in
-    (toFloat << round)
-        (x * exp)
-        / exp
-
-
 viewTable : Int -> Int -> Model -> Element msg
-viewTable w h { results, state } =
+viewTable w h model =
     let
+        { results, state } =
+            getSimulation model.currentSimulation model.simulations
+
         cellWidth =
             65
 
@@ -758,13 +840,16 @@ viewTable w h { results, state } =
 viewRepresentation : Float -> Model -> Element Msg
 viewRepresentation w model =
     let
+        currentSimulation =
+            getSimulation model.currentSimulation model.simulations
+
         representation =
             case model.currentRepresentation of
                 Chart ->
                     Chart.render
                         (round (w - 40))
                         (round (w / 3))
-                        model.results
+                        currentSimulation.results
 
                 Table ->
                     viewTable
@@ -931,7 +1016,11 @@ view model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.state of
+    let
+        currentSimulation =
+            getSimulation model.currentSimulation model.simulations
+    in
+    case currentSimulation.state of
         Running _ _ ->
             onAnimationFrame <| always Frame
 
